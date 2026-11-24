@@ -1,0 +1,624 @@
+<!doctype html>
+<html lang="sv">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<title>Skolval</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;700&family=JetBrains+Mono:wght@400;600&family=Rubik:wght@400;500;600&display=swap">
+<style>
+/* Layout: game-HUD over one sortable "quest log" table. Deliberately dark single theme (indigo night, cyan + magenta neon). */
+:root {
+  --bg: #0d0e1f;
+  --surface: #15173a;
+  --surface-2: #1c1f4a;
+  --fg: #ecedff;
+  --muted: #9195c8;
+  --line: #2c3070;
+  --cyan: #3ee6ff;
+  --magenta: #ff4fd8;
+  --star: #ffd23f;
+  --ok: #5cf2a1;
+  --font-display: "Chakra Petch", "Segoe UI", system-ui, sans-serif;
+  --font-body: "Rubik", "Segoe UI", system-ui, sans-serif;
+  --font-data: "JetBrains Mono", ui-monospace, Menlo, monospace;
+  color-scheme: dark;
+}
+body {
+  background: var(--bg); color: var(--fg); font-family: var(--font-body); font-size: 14px; line-height: 1.45;
+  background-image: radial-gradient(1200px 500px at 85% -10%, color-mix(in srgb, var(--magenta) 16%, transparent), transparent 70%),
+                    radial-gradient(900px 420px at -10% 0%, color-mix(in srgb, var(--cyan) 13%, transparent), transparent 70%);
+  background-attachment: fixed;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 28px 48px;
+}
+.wrap { max-width: 1400px; margin: 0 auto; display: grid; gap: 18px; }
+header { display: grid; gap: 8px; }
+.eyebrow { font-family: var(--font-data); font-size: 12px; letter-spacing: .12em; text-transform: uppercase; color: var(--cyan); display: flex; align-items: center; gap: 8px; }
+.eyebrow .blink { width: 8px; height: 8px; background: var(--cyan); box-shadow: 0 0 10px var(--cyan); animation: blink 1.6s steps(2) infinite; }
+@keyframes blink { 50% { opacity: .25; } }
+h1 { font-family: var(--font-display); font-weight: 700; font-size: clamp(30px, 5vw, 48px); margin: 0; line-height: 1.05; text-transform: uppercase; letter-spacing: .01em; text-wrap: balance; }
+h1 .hl { color: var(--magenta); text-shadow: 0 0 18px color-mix(in srgb, var(--magenta) 60%, transparent); }
+.lede { color: var(--muted); max-width: 72ch; margin: 0; }
+
+.hud { display: flex; flex-wrap: wrap; gap: 12px; }
+.stat { background: var(--surface); border: 1px solid var(--line); padding: 10px 14px; min-width: 0; flex: 1 1 180px; clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 12px 100%, 0 calc(100% - 12px)); }
+.stat .lbl { font-family: var(--font-data); font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+.stat .val { font-family: var(--font-display); font-size: 22px; font-weight: 700; }
+.xp { height: 8px; background: var(--bg); border: 1px solid var(--line); margin-top: 6px; }
+.xp > i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, var(--cyan), var(--magenta)); box-shadow: 0 0 10px var(--cyan); transition: width .4s; }
+.stat.next .val { font-size: 16px; line-height: 1.3; }
+.stat.next .val small { display: block; font-family: var(--font-data); font-size: 12px; color: var(--cyan); font-weight: 400; }
+
+.toolbar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.toolbar input[type=search] { flex: 1 1 220px; min-width: 0; padding: 9px 12px; border: 1px solid var(--line); background: var(--surface); color: var(--fg); font: inherit; border-radius: 0; }
+.toolbar input[type=search]:focus { outline: none; border-color: var(--cyan); box-shadow: 0 0 0 1px var(--cyan); }
+.chip { border: 1px solid var(--line); background: var(--surface); color: var(--fg); padding: 7px 12px; font: inherit; font-family: var(--font-data); font-size: 12px; text-transform: uppercase; letter-spacing: .06em; cursor: pointer; }
+.chip:hover { border-color: var(--cyan); }
+.chip[aria-pressed="true"] { border-color: var(--magenta); color: var(--magenta); box-shadow: inset 0 0 0 1px var(--magenta); }
+.btn { border: 0; background: var(--cyan); color: var(--bg); padding: 8px 14px; font: inherit; font-family: var(--font-display); font-weight: 700; text-transform: uppercase; letter-spacing: .05em; cursor: pointer; clip-path: polygon(8px 0, 100% 0, calc(100% - 8px) 100%, 0 100%); }
+.btn:hover { background: var(--magenta); }
+.status { font-size: 12px; color: var(--muted); margin-left: auto; font-family: var(--font-data); }
+button:focus-visible, .chip:focus-visible { outline: 2px solid var(--magenta); outline-offset: 2px; }
+
+.table-box { overflow-x: auto; background: color-mix(in srgb, var(--surface) 88%, transparent); border: 1px solid var(--line); min-width: 0; }
+table { border-collapse: collapse; width: 100%; min-width: 1240px; }
+th, td { text-align: left; padding: 9px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+thead th { position: sticky; top: 0; background: var(--surface-2); z-index: 1; white-space: nowrap; }
+th button.sort { all: unset; cursor: pointer; display: inline-flex; gap: 5px; align-items: center; font-family: var(--font-data); font-size: 11px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+th button.sort:hover { color: var(--fg); }
+th[aria-sort="ascending"] button.sort, th[aria-sort="descending"] button.sort { color: var(--cyan); }
+th button.sort:focus-visible { outline: 2px solid var(--magenta); outline-offset: 2px; }
+th button.sort .arrow { min-width: 1ch; }
+tbody tr { transition: background .15s; }
+tbody tr:hover { background: color-mix(in srgb, var(--cyan) 7%, transparent); }
+tbody tr.visited { box-shadow: inset 3px 0 0 var(--ok); }
+.num { font-family: var(--font-data); font-variant-numeric: tabular-nums; text-align: right; }
+.cell-input { font: inherit; font-family: var(--font-data); color: var(--fg); background: transparent; border: 1px solid transparent; padding: 2px 4px; width: 6.4ch; text-align: right; }
+.cell-input:hover { border-color: var(--line); }
+.cell-input:focus { outline: none; border-color: var(--cyan); background: var(--bg); }
+.bar { height: 4px; background: var(--bg); margin-top: 4px; margin-left: auto; width: 78px; }
+.bar > i { display: block; height: 100%; background: var(--cyan); }
+.bar.avg > i { background: var(--magenta); }
+.src { display: block; font-size: 10.5px; color: var(--muted); font-family: var(--font-data); margin-top: 3px; white-space: nowrap; }
+.name { font-weight: 600; font-size: 15px; }
+.visited .name::after { content: " ✓"; color: var(--ok); }
+.sub { font-size: 12px; color: var(--muted); }
+.tag { display: inline-block; font-family: var(--font-data); font-size: 10.5px; letter-spacing: .06em; text-transform: uppercase; padding: 2px 7px; border: 1px solid var(--line); color: var(--muted); white-space: nowrap; }
+.tag.kom { border-color: var(--cyan); color: var(--cyan); }
+.tag.fri { border-color: var(--magenta); color: var(--magenta); }
+.stars { display: inline-flex; gap: 1px; }
+.stars button { all: unset; cursor: pointer; font-size: 18px; line-height: 1; color: var(--line); padding: 1px; }
+.stars button.on { color: var(--star); text-shadow: 0 0 8px color-mix(in srgb, var(--star) 70%, transparent); }
+.stars button:focus-visible { outline: 2px solid var(--magenta); }
+td.fav { white-space: nowrap; }
+input[type=checkbox] { width: 20px; height: 20px; accent-color: var(--ok); cursor: pointer; }
+textarea.comment { width: 100%; min-width: 200px; min-height: 36px; resize: vertical; font: inherit; color: var(--fg); background: var(--bg); border: 1px solid var(--line); padding: 6px 8px; }
+textarea.comment:focus { outline: none; border-color: var(--cyan); }
+a.route { color: var(--cyan); text-decoration: none; }
+a.route:hover { text-decoration: underline; }
+
+.oh { display: grid; gap: 4px; min-width: 190px; }
+.oh-item { display: flex; gap: 6px; align-items: baseline; font-size: 12.5px; }
+.oh-date { font-family: var(--font-data); font-weight: 600; white-space: nowrap; }
+.oh-note { color: var(--muted); }
+.oh-item.next .oh-date { color: var(--bg); background: var(--magenta); padding: 0 5px; box-shadow: 0 0 10px color-mix(in srgb, var(--magenta) 60%, transparent); }
+.oh-item.soon .oh-date::after { content: " SNART"; font-size: 9.5px; letter-spacing: .08em; }
+.oh-item.past { opacity: .45; text-decoration: line-through; }
+.oh-none { color: var(--muted); font-size: 12px; }
+.oh-edit { all: unset; cursor: pointer; font-family: var(--font-data); font-size: 10.5px; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; }
+.oh-edit:hover { color: var(--cyan); }
+.oh-input { width: 100%; font: inherit; font-family: var(--font-data); font-size: 12px; color: var(--fg); background: var(--bg); border: 1px solid var(--cyan); padding: 4px 6px; }
+
+.login { position: fixed; inset: 0; z-index: 50; background: color-mix(in srgb, var(--bg) 92%, transparent); display: grid; place-items: center; padding: max(16px, env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) max(16px, env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px)); }
+.login-box { display: grid; gap: 12px; width: min(360px, 100%); background: var(--surface); border: 1px solid var(--cyan); padding: 22px; }
+.login-box strong { font-family: var(--font-display); font-size: 22px; text-transform: uppercase; }
+.login-box input { font: inherit; padding: 10px 12px; background: var(--bg); color: var(--fg); border: 1px solid var(--line); }
+.login-box input:focus { outline: none; border-color: var(--cyan); }
+.login-err { color: var(--magenta); font-size: 13px; }
+.stat.me { border-color: var(--cyan); }
+.merit-row { display: flex; align-items: baseline; gap: 8px; }
+.merit-in { width: 6ch; font-family: var(--font-display); font-size: 22px; font-weight: 700; color: var(--cyan); background: var(--bg); border: 1px solid var(--line); padding: 2px 6px; }
+.merit-in:focus { outline: none; border-color: var(--cyan); box-shadow: 0 0 0 1px var(--cyan); }
+.merit-row span { font-family: var(--font-data); font-size: 12px; color: var(--muted); }
+.tally { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.chance { display: inline-block; font-family: var(--font-data); font-size: 10.5px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; padding: 2px 7px; border: 1px solid currentColor; white-space: nowrap; }
+.chance.c4 { color: var(--ok); }
+.chance.c3 { color: var(--cyan); }
+.chance.c2 { color: var(--star); }
+.chance.c1 { color: var(--magenta); }
+.chance.c0 { color: var(--muted); border-style: dashed; }
+.chance-diff { display: block; font-family: var(--font-data); font-size: 10.5px; color: var(--muted); margin-top: 3px; white-space: nowrap; }
+.hide-btn { all: unset; cursor: pointer; font-family: var(--font-data); font-size: 10.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin-top: 4px; display: inline-block; }
+.hide-btn:hover { color: var(--magenta); }
+.hide-btn:focus-visible { outline: 2px solid var(--magenta); outline-offset: 2px; }
+tbody tr.hidden-row td { opacity: .4; }
+tbody tr.hidden-row td:nth-child(2) { opacity: 1; }
+tbody tr.out td { opacity: .5; }
+tbody tr.out td:first-child, tbody tr.out td:last-child { opacity: 1; }
+.empty { padding: 32px 16px; text-align: center; color: var(--muted); }
+.notes { color: var(--muted); font-size: 12.5px; max-width: 95ch; display: grid; gap: 5px; }
+.notes strong { color: var(--fg); font-weight: 600; }
+dialog { border: 1px solid var(--cyan); background: var(--surface); color: var(--fg); padding: 18px; width: min(420px, calc(100vw - 32px)); }
+dialog::backdrop { background: rgba(5, 5, 20, .7); }
+dialog form { display: grid; gap: 10px; }
+dialog strong { font-family: var(--font-display); text-transform: uppercase; font-size: 18px; }
+dialog label { display: grid; gap: 3px; font-size: 12px; color: var(--muted); }
+dialog input, dialog select { font: inherit; padding: 7px 8px; border: 1px solid var(--line); background: var(--bg); color: var(--fg); }
+dialog .row { display: flex; gap: 8px; justify-content: flex-end; }
+dialog .ghost { background: transparent; color: var(--fg); border: 1px solid var(--line); clip-path: none; }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+[hidden] { display: none !important; }
+*, *::before, *::after { box-sizing: border-box; }
+body { margin: 0; }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow"><span class="blink"></span>Spawn point: Sandsborg T · gröna linjen</div>
+    <h1>Välj ditt <span class="hl">gymnasium</span> · Natur</h1>
+    <p class="lede">Alla NA-skolor i Stockholms stad. Klicka på en kolumnrubrik för att sortera. Stjärnor, besök, öppet hus och anteckningar sparas direkt. Klicka i en siffra för att rätta den.</p>
+  </header>
+
+  <div class="login" id="login" hidden>
+    <form id="loginform" class="login-box">
+      <div class="eyebrow"><span class="blink"></span>Låst område</div>
+      <strong>Skriv familjens lösenord</strong>
+      <input type="password" id="pw" autocomplete="current-password" placeholder="Lösenord" required>
+      <button class="btn" type="submit">Logga in</button>
+      <span class="login-err" id="login-err" hidden>Fel lösenord, försök igen.</span>
+    </form>
+  </div>
+
+  <section class="hud" aria-label="Översikt">
+    <div class="stat me">
+      <label class="lbl" for="merit">Ditt meritvärde</label>
+      <div class="merit-row"><input id="merit" class="merit-in" inputmode="decimal" placeholder="–" autocomplete="off"><span>/ 340</span></div>
+      <div class="tally" id="h-tally"><span class="chance-diff">Skriv in poängen så visas chansen per skola</span></div>
+    </div>
+    <div class="stat">
+      <div class="lbl">Besökta skolor</div>
+      <div class="val" id="h-visited">–</div>
+      <div class="xp"><i id="h-xp"></i></div>
+    </div>
+    <div class="stat">
+      <div class="lbl">Favoriter</div>
+      <div class="val" id="h-fav">–</div>
+    </div>
+    <div class="stat next">
+      <div class="lbl">Nästa öppet hus</div>
+      <div class="val" id="h-next">–</div>
+    </div>
+  </section>
+
+  <div class="toolbar">
+    <input type="search" id="q" placeholder="Sök skola, område eller anteckning…" aria-label="Sök skola">
+    <button class="chip" id="f-fav" aria-pressed="false">★ Favoriter</button>
+    <button class="chip" id="f-unvisited" aria-pressed="false">Ej besökta</button>
+    <button class="chip" id="f-oh" aria-pressed="false">Har kommande öppet hus</button>
+    <button class="chip" id="f-reach" aria-pressed="false">Bara inom räckhåll</button>
+    <button class="chip" id="f-hidden" aria-pressed="false" hidden>Visa dolda</button>
+    <button class="btn" id="add">+ Lägg till skola</button>
+    <span class="status" id="status">Ansluter…</span>
+  </div>
+
+  <div class="table-box">
+    <table>
+      <thead>
+        <tr>
+          <th><button class="sort" data-key="fav">Favorit<span class="arrow"></span></button></th>
+          <th><button class="sort" data-key="name">Skola<span class="arrow"></span></button></th>
+          <th><button class="sort" data-key="type">Huvudman<span class="arrow"></span></button></th>
+          <th class="num"><button class="sort" data-key="min">Lägsta merit<span class="arrow"></span></button></th>
+          <th class="num"><button class="sort" data-key="avg">Medelmerit<span class="arrow"></span></button></th>
+          <th><button class="sort" data-key="chance">Chans<span class="arrow"></span></button></th>
+          <th class="num"><button class="sort" data-key="travel">Restid SL<span class="arrow"></span></button></th>
+          <th class="num"><button class="sort" data-key="dist">Avstånd<span class="arrow"></span></button></th>
+          <th><button class="sort" data-key="oh">Öppet hus<span class="arrow"></span></button></th>
+          <th><button class="sort" data-key="visited">Besökt<span class="arrow"></span></button></th>
+          <th style="width:24%"><button class="sort" data-key="comment">Kommentar<span class="arrow"></span></button></th>
+        </tr>
+      </thead>
+      <tbody id="rows">
+        <tr><td colspan="11" class="empty">Laddar skolorna… Om inget dyker upp, lägg till en skola med knappen ovan.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="notes">
+    <div><strong>Merit:</strong> lägsta antagna och medelvärde för antagna, max 340. Några källor anger median i stället för medel, då står ”median” under siffran. Staplarna visar andel av 340. År och källa står under siffran. Tomt betyder att ingen NA-specifik siffra hittades.</div>
+    <div><strong>Chans:</strong> jämför ditt meritvärde med förra antagningen. <em>Säker</em> = minst medelmeriten. <em>Bra chans</em> = minst lägsta antagna. <em>Kanske</em> = upp till 10 poäng under lägsta. <em>Svårt</em> = mer än 10 under. Gränserna flyttar sig varje år beroende på vilka som söker, så se det som en fingervisning.</div>
+    <div><strong>Öppet hus:</strong> nästa tillfälle är rosa, passerade är överstrukna. Datum kommer från skolornas webbplatser och skolsafari.se, kollade 24 nov 2026. Dubbelkolla på skolans sida innan ni åker. Klicka på ”ändra” för att rätta. Format: <code>2027-01-21 17–19; 2027-04-20</code>.</div>
+    <div><strong>Restid:</strong> uppskattad dörr till dörr med SL från Sandsborg, vardag dagtid. ”rutt ↗” öppnar reseplanering så du kan kolla. <strong>Avstånd:</strong> fågelvägen.</div>
+  </div>
+</div>
+
+<dialog id="dlg">
+  <form id="addform" method="dialog">
+    <strong>Lägg till skola</strong>
+    <label>Skolans namn<input id="a-name" required></label>
+    <label>Område<input id="a-area" placeholder="t.ex. Södermalm"></label>
+    <label>Huvudman<select id="a-type"><option value="kommunal">Kommunal</option><option value="fristående">Fristående</option></select></label>
+    <div class="row"><button type="button" class="btn ghost" id="a-cancel">Avbryt</button><button class="btn" type="submit">Spara</button></div>
+  </form>
+</dialog>
+
+<script>
+(function () {
+  const ORIGIN = { lat: 59.2846, lng: 18.0921 };
+  const MAXMERIT = 340;
+  const DAY = 86400000;
+  let schools = [];
+  let sort = { key: "oh", dir: "asc" };
+  let filterFav = false, filterUnvisited = false, filterOh = false, filterReach = false, showHidden = false, query = "";
+  let merit = null;
+  const MARGIN = 10;
+  const CHANCE_LABEL = ["Ingen data", "Svårt", "Kanske", "Bra chans", "Säker"];
+  function chance(s) {
+    if (merit === null) return null;
+    const min = typeof s.min === "number" ? s.min : null, avg = typeof s.avg === "number" ? s.avg : null;
+    if (min === null && avg === null) return 0;
+    if (avg !== null && merit >= avg) return 4;
+    if (min !== null && merit >= min) return 3;
+    if (min !== null && merit >= min - MARGIN) return 2;
+    if (min === null) return merit >= avg - MARGIN ? 2 : 1;
+    return 1;
+  }
+  const meritIn = document.getElementById("merit");
+  function setMerit(v, fromStore) {
+    merit = (typeof v === "number" && isFinite(v) && v > 0) ? Math.min(v, MAXMERIT) : null;
+    if (document.activeElement !== meritIn) meritIn.value = merit === null ? "" : fmt(merit, merit % 1 ? 1 : 0);
+    if (!fromStore) try { localStorage.setItem("na-merit", merit === null ? "" : String(merit)); } catch (e) {}
+  }
+  let editingOh = null;
+  const statusEl = document.getElementById("status");
+  const tbody = document.getElementById("rows");
+
+  try {
+    const saved = JSON.parse(localStorage.getItem("na-sort2") || "null");
+    if (saved && saved.key) sort = saved;
+  } catch (e) {}
+
+  function today() { const d = new Date(); d.setHours(0, 0, 0, 0); return d; }
+
+  function parseOh(str) {
+    if (!str) return [];
+    return str.split(";").map(p => p.trim()).filter(Boolean).map(p => {
+      const m = p.match(/^(\d{4})-(\d{2})-(\d{2})\s*(.*)$/);
+      if (!m) return { date: null, note: p };
+      return { date: new Date(+m[1], +m[2] - 1, +m[3]), note: m[4] || "" };
+    });
+  }
+  function nextOh(s) {
+    const t = today();
+    const up = parseOh(s.oh).filter(x => x.date && x.date >= t).sort((a, b) => a.date - b.date);
+    return up[0] || null;
+  }
+  const WD = ["sön", "mån", "tis", "ons", "tor", "fre", "lör"];
+  const MO = ["jan", "feb", "mar", "apr", "maj", "jun", "jul", "aug", "sep", "okt", "nov", "dec"];
+  function fmtDate(d) {
+    return WD[d.getDay()] + " " + d.getDate() + " " + MO[d.getMonth()] + (d.getFullYear() !== today().getFullYear() ? " " + d.getFullYear() : "");
+  }
+
+  function distKm(s) {
+    if (typeof s.lat !== "number" || typeof s.lng !== "number") return null;
+    const R = 6371, toR = x => x * Math.PI / 180;
+    const dLat = toR(s.lat - ORIGIN.lat), dLng = toR(s.lng - ORIGIN.lng);
+    const a = Math.sin(dLat / 2) ** 2 + Math.cos(toR(ORIGIN.lat)) * Math.cos(toR(s.lat)) * Math.sin(dLng / 2) ** 2;
+    return 2 * R * Math.asin(Math.sqrt(a));
+  }
+  function val(s, key) {
+    switch (key) {
+      case "dist": return distKm(s);
+      case "fav": return s.fav || 0;
+      case "visited": return s.visited ? 1 : 0;
+      case "oh": { const n = nextOh(s); return n ? n.date.getTime() : null; }
+      case "chance": { const c = chance(s); return c ? c * 1000 + (typeof s.min === "number" ? merit - s.min : 0) : null; }
+      case "name": case "type": case "comment": return (s[key] || "").toString().toLowerCase() || null;
+      default: return typeof s[key] === "number" ? s[key] : null;
+    }
+  }
+  function sorted(list) {
+    const k = sort.key, d = sort.dir === "asc" ? 1 : -1;
+    return list.slice().sort((a, b) => {
+      const va = val(a, k), vb = val(b, k);
+      if (va === null && vb === null) return (a.name || "").localeCompare(b.name || "", "sv");
+      if (va === null) return 1;
+      if (vb === null) return -1;
+      if (typeof va === "string") return va.localeCompare(vb, "sv") * d;
+      return (va - vb) * d || (a.name || "").localeCompare(b.name || "", "sv");
+    });
+  }
+  function fmt(n, dec) {
+    return typeof n === "number" ? n.toLocaleString("sv-SE", { minimumFractionDigits: dec, maximumFractionDigits: dec }) : "";
+  }
+  function el(tag, props, kids) {
+    const e = document.createElement(tag);
+    if (props) for (const [k, v] of Object.entries(props)) {
+      if (k === "class") e.className = v; else if (k === "text") e.textContent = v; else if (k in e) e[k] = v; else e.setAttribute(k, v);
+    }
+    (kids || []).forEach(c => c && e.appendChild(c));
+    return e;
+  }
+
+  /* Data layer: the page talks to /api/* on its own server. The server checks the family
+     password cookie and stores everything in Supabase; no database key ever reaches the browser. */
+  async function api(path, opts) {
+    const res = await fetch(path, Object.assign({ credentials: "same-origin", headers: { "Content-Type": "application/json" } }, opts || {}));
+    if (res.status === 401) { showLogin(); throw new Error("unauthorized"); }
+    if (!res.ok) throw new Error("http " + res.status);
+    return res.status === 204 ? null : res.json();
+  }
+  function showLogin() {
+    document.getElementById("login").hidden = false;
+    statusEl.textContent = "Inte inloggad";
+    setTimeout(() => { const p = document.getElementById("pw"); if (p) p.focus(); }, 0);
+  }
+
+  function save(id, patch) {
+    const s = schools.find(x => x.id === id);
+    if (s) Object.assign(s, patch);
+    statusEl.textContent = "Sparar…";
+    api("/api/schools?id=" + encodeURIComponent(id), { method: "PATCH", body: JSON.stringify(patch) })
+      .then(() => { statusEl.textContent = "Sparat ✓"; })
+      .catch(e => { if (e.message !== "unauthorized") statusEl.textContent = "Kunde inte spara, försök igen"; });
+  }
+
+
+  function numInput(s, key, dec, label) {
+    const inp = el("input", { class: "cell-input", inputMode: "decimal", value: fmt(s[key], dec), "aria-label": label + " för " + s.name });
+    inp.addEventListener("change", () => {
+      const raw = inp.value.trim().replace(",", ".");
+      const n = raw === "" ? null : Number(raw);
+      if (raw !== "" && !isFinite(n)) { inp.value = fmt(s[key], dec); return; }
+      const patch = { [key]: n };
+      if (key === "min" || key === "avg") { patch.src = "egen uppgift"; patch.year = ""; }
+      save(s.id, patch);
+      render();
+    });
+    return inp;
+  }
+  function bar(v, cls) {
+    const b = el("div", { class: "bar" + (cls ? " " + cls : "") });
+    const i = el("i");
+    i.style.width = typeof v === "number" ? Math.max(0, Math.min(100, v / MAXMERIT * 100)) + "%" : "0";
+    b.appendChild(i);
+    return b;
+  }
+
+  function routeUrl(s) {
+    const dest = s.addr || (s.name + ", Stockholm");
+    return "https://www.google.com/maps/dir/?api=1&origin=" + encodeURIComponent("Sandsborg tunnelbanestation, Stockholm") +
+      "&destination=" + encodeURIComponent(dest) + "&travelmode=transit";
+  }
+
+  function ohCell(s) {
+    const wrap = el("div", { class: "oh" });
+    if (editingOh === s.id) {
+      const inp = el("input", { class: "oh-input", value: s.oh || "", placeholder: "2027-01-21 17–19; 2027-04-20", "aria-label": "Öppet hus för " + s.name });
+      const done = () => { editingOh = null; if ((s.oh || "") !== inp.value.trim()) save(s.id, { oh: inp.value.trim(), ohSrc: "egen uppgift" }); render(); };
+      inp.addEventListener("keydown", e => { if (e.key === "Enter") done(); if (e.key === "Escape") { editingOh = null; render(); } });
+      inp.addEventListener("blur", done);
+      wrap.appendChild(inp);
+      setTimeout(() => inp.focus(), 0);
+      return wrap;
+    }
+    const items = parseOh(s.oh);
+    const t = today(), nx = nextOh(s);
+    if (!items.length) wrap.appendChild(el("span", { class: "oh-none", text: "Inget datum hittat" }));
+    items.forEach(it => {
+      let cls = "oh-item";
+      if (it.date && it.date < t) cls += " past";
+      if (nx && it.date && it.date.getTime() === nx.date.getTime()) {
+        cls += " next";
+        if ((it.date - t) / DAY <= 10) cls += " soon";
+      }
+      wrap.appendChild(el("div", { class: cls }, [
+        el("span", { class: "oh-date", text: it.date ? fmtDate(it.date) : "?" }),
+        el("span", { class: "oh-note", text: it.note })
+      ]));
+    });
+    const meta = el("div", { class: "src" });
+    if (s.ohSrc) meta.appendChild(document.createTextNode(s.ohSrc + " · "));
+    const eb = el("button", { class: "oh-edit", text: "ändra", "aria-label": "Ändra öppet hus för " + s.name });
+    eb.addEventListener("click", () => { editingOh = s.id; render(); });
+    meta.appendChild(eb);
+    wrap.appendChild(meta);
+    return wrap;
+  }
+
+  function renderHud() {
+    const shown = schools.filter(s => !s.hidden);
+    const total = shown.length, vis = shown.filter(s => s.visited).length;
+    document.getElementById("h-visited").textContent = total ? vis + " / " + total : "–";
+    document.getElementById("h-xp").style.width = total ? (vis / total * 100) + "%" : "0";
+    document.getElementById("h-fav").textContent = total ? shown.filter(s => (s.fav || 0) > 0).length + " skolor" : "–";
+    const nexts = shown.map(s => ({ s, n: nextOh(s) })).filter(x => x.n).sort((a, b) => a.n.date - b.n.date);
+    const favFirst = nexts.find(x => (x.s.fav || 0) > 0);
+    const pick = favFirst || nexts[0];
+    const h = document.getElementById("h-next");
+    h.replaceChildren();
+    if (!pick) { h.textContent = "–"; return; }
+    h.appendChild(document.createTextNode(pick.s.name));
+    h.appendChild(el("small", { text: fmtDate(pick.n.date) + (pick.n.note ? " · " + pick.n.note : "") + (favFirst ? " · favorit" : "") }));
+  }
+
+  function renderTally() {
+    const t = document.getElementById("h-tally");
+    t.replaceChildren();
+    if (merit === null) { t.appendChild(el("span", { class: "chance-diff", text: "Skriv in poängen så visas chansen per skola" })); return; }
+    [4, 3, 2, 1].forEach(c => {
+      const n = schools.filter(s => !s.hidden && chance(s) === c).length;
+      if (n) t.appendChild(el("span", { class: "chance c" + c, text: n + " " + CHANCE_LABEL[c] }));
+    });
+  }
+
+  function chanceCell(s) {
+    const c = chance(s);
+    if (c === null) return [el("span", { class: "chance-diff", text: "Fyll i merit" })];
+    const out = [el("span", { class: "chance c" + c, text: CHANCE_LABEL[c] })];
+    if (typeof s.min === "number") {
+      const d = Math.round((merit - s.min) * 10) / 10;
+      out.push(el("span", { class: "chance-diff", text: (d >= 0 ? "+" : "−") + fmt(Math.abs(d), d % 1 ? 1 : 0) + " mot lägsta" }));
+    }
+    return out;
+  }
+
+  function render() {
+    document.querySelectorAll("th button.sort").forEach(b => {
+      const on = b.dataset.key === sort.key;
+      b.querySelector(".arrow").textContent = on ? (sort.dir === "asc" ? "▲" : "▼") : "";
+      b.closest("th").setAttribute("aria-sort", on ? (sort.dir === "asc" ? "ascending" : "descending") : "none");
+    });
+    renderHud();
+    renderTally();
+    const nHidden = schools.filter(s => s.hidden).length;
+    const hb = document.getElementById("f-hidden");
+    hb.hidden = nHidden === 0 && !showHidden;
+    if (nHidden === 0) { showHidden = false; hb.setAttribute("aria-pressed", "false"); }
+    hb.textContent = "Visa dolda (" + nHidden + ")";
+    const q = query.trim().toLowerCase();
+    const list = sorted(schools.filter(s =>
+      (showHidden || !s.hidden) &&
+      (!filterReach || merit === null || (chance(s) || 0) >= 2) &&
+      (!filterFav || (s.fav || 0) > 0) &&
+      (!filterUnvisited || !s.visited) &&
+      (!filterOh || nextOh(s)) &&
+      (!q || (s.name + " " + (s.area || "") + " " + (s.comment || "")).toLowerCase().includes(q))
+    ));
+    tbody.replaceChildren();
+    if (!list.length) {
+      tbody.appendChild(el("tr", null, [el("td", { colSpan: 11, class: "empty", text: schools.length ? "Inga skolor matchar filtret." : "Listan är tom. Lägg till en skola med knappen ovan." })]));
+      return;
+    }
+    for (const s of list) {
+      const stars = el("span", { class: "stars", role: "group", "aria-label": "Favoritgrad" });
+      for (let i = 1; i <= 3; i++) {
+        const b = el("button", { class: (s.fav || 0) >= i ? "on" : "", text: "★", title: i + " av 3", "aria-label": "Sätt " + i + " av 3 stjärnor" });
+        b.addEventListener("click", () => { save(s.id, { fav: (s.fav || 0) === i ? 0 : i }); render(); });
+        stars.appendChild(b);
+      }
+      const cb = el("input", { type: "checkbox", checked: !!s.visited, "aria-label": "Besökt " + s.name });
+      cb.addEventListener("change", () => { save(s.id, { visited: cb.checked }); render(); });
+
+      const ta = el("textarea", { class: "comment", value: s.comment || "", placeholder: "Anteckning…", "aria-label": "Kommentar för " + s.name });
+      let t;
+      ta.addEventListener("input", () => { clearTimeout(t); t = setTimeout(() => save(s.id, { comment: ta.value }), 900); });
+      ta.addEventListener("blur", () => { clearTimeout(t); if ((s.comment || "") !== ta.value) save(s.id, { comment: ta.value }); });
+
+      const d = distKm(s);
+      const hideBtn = el("button", { class: "hide-btn", text: s.hidden ? "↺ Visa igen" : "✕ Dölj", "aria-label": (s.hidden ? "Visa " : "Dölj ") + s.name });
+      hideBtn.addEventListener("click", () => { save(s.id, { hidden: !s.hidden }); render(); });
+      const tr = el("tr", { class: [s.visited ? "visited" : "", chance(s) === 1 ? "out" : "", s.hidden ? "hidden-row" : ""].join(" ").trim() }, [
+        el("td", { class: "fav" }, [stars]),
+        el("td", null, [
+          el("div", { class: "name", text: s.name }),
+          el("div", { class: "sub", text: [s.area, s.track].filter(Boolean).join(" · ") }),
+          hideBtn
+        ]),
+        el("td", null, [el("span", { class: "tag " + (s.type === "kommunal" ? "kom" : "fri"), text: s.type || "–" })]),
+        el("td", { class: "num" }, [numInput(s, "min", 1, "Lägsta merit"), bar(s.min), el("span", { class: "src", text: [s.year, s.src].filter(Boolean).join(" · ") })]),
+        el("td", { class: "num" }, [numInput(s, "avg", 1, "Medelmerit"), bar(s.avg, "avg")]),
+        el("td", null, chanceCell(s)),
+        el("td", { class: "num" }, [
+          el("span", null, [numInput(s, "travel", 0, "Restid"), document.createTextNode(" min")]),
+          el("a", { class: "route src", href: routeUrl(s), target: "_blank", rel: "noopener", text: "rutt ↗" })
+        ]),
+        el("td", { class: "num", text: d === null ? "–" : fmt(d, 1) + " km" }),
+        el("td", null, [ohCell(s)]),
+        el("td", null, [cb]),
+        el("td", null, [ta])
+      ]);
+      tbody.appendChild(tr);
+    }
+  }
+
+  document.querySelectorAll("th button.sort").forEach(b => b.addEventListener("click", () => {
+    const k = b.dataset.key;
+    if (sort.key === k) sort.dir = sort.dir === "asc" ? "desc" : "asc";
+    else sort = { key: k, dir: ["name", "type", "travel", "dist", "comment", "oh"].includes(k) ? "asc" : "desc" };
+    try { localStorage.setItem("na-sort2", JSON.stringify(sort)); } catch (e) {}
+    render();
+  }));
+  document.getElementById("q").addEventListener("input", e => { query = e.target.value; render(); });
+  function toggle(id, getter, setter) {
+    const b = document.getElementById(id);
+    b.addEventListener("click", () => { setter(!getter()); b.setAttribute("aria-pressed", getter()); render(); });
+  }
+  toggle("f-fav", () => filterFav, v => filterFav = v);
+  toggle("f-unvisited", () => filterUnvisited, v => filterUnvisited = v);
+  toggle("f-oh", () => filterOh, v => filterOh = v);
+  toggle("f-reach", () => filterReach, v => filterReach = v);
+  toggle("f-hidden", () => showHidden, v => showHidden = v);
+
+  try { const m = parseFloat(localStorage.getItem("na-merit") || ""); if (isFinite(m)) setMerit(m, true); } catch (e) {}
+  let meritTimer;
+  meritIn.addEventListener("input", () => {
+    const raw = meritIn.value.trim().replace(",", ".");
+    setMerit(raw === "" ? null : Number(raw));
+    render();
+    clearTimeout(meritTimer);
+    meritTimer = setTimeout(() => {
+      api("/api/settings", { method: "PUT", body: JSON.stringify({ merit: merit }) }).catch(() => {});
+    }, 800);
+  });
+  meritIn.addEventListener("blur", () => { meritIn.value = merit === null ? "" : fmt(merit, merit % 1 ? 1 : 0); });
+
+  const dlg = document.getElementById("dlg");
+  document.getElementById("add").addEventListener("click", () => { if (dlg.showModal) dlg.showModal(); });
+  document.getElementById("a-cancel").addEventListener("click", () => dlg.close());
+  document.getElementById("addform").addEventListener("submit", e => {
+    e.preventDefault();
+    const name = document.getElementById("a-name").value.trim();
+    if (!name) return;
+    const doc = { name, area: document.getElementById("a-area").value.trim(), type: document.getElementById("a-type").value,
+      min: null, avg: null, travel: null, fav: 0, visited: false, comment: "", src: "", year: "", oh: "", ohSrc: "" };
+    dlg.close();
+    document.getElementById("addform").reset();
+    api("/api/schools", { method: "POST", body: JSON.stringify(doc) })
+      .then(row => { schools.push(row); statusEl.textContent = "Skola tillagd ✓"; render(); })
+      .catch(e => { if (e.message !== "unauthorized") statusEl.textContent = "Kunde inte lägga till skolan"; });
+  });
+
+  render();
+
+  function isEditing() {
+    const a = document.activeElement;
+    return !!(a && (a.tagName === "TEXTAREA" || a.classList.contains("cell-input") || a.classList.contains("oh-input") || a === meritIn));
+  }
+  async function load(force) {
+    if (!force && (isEditing() || document.hidden)) return;
+    try {
+      const [rows, settings] = await Promise.all([api("/api/schools"), api("/api/settings")]);
+      if (!force && isEditing()) return;
+      schools = rows;
+      if (settings && document.activeElement !== meritIn) setMerit(typeof settings.merit === "number" ? settings.merit : null, true);
+      document.getElementById("login").hidden = true;
+      statusEl.textContent = schools.length + " skolor";
+      render();
+    } catch (e) {
+      if (e.message !== "unauthorized") statusEl.textContent = "Kunde inte hämta listan";
+    }
+  }
+  document.getElementById("loginform").addEventListener("submit", async e => {
+    e.preventDefault();
+    const err = document.getElementById("login-err");
+    err.hidden = true;
+    try {
+      const res = await fetch("/api/login", { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ password: document.getElementById("pw").value }) });
+      if (!res.ok) { err.hidden = false; return; }
+      document.getElementById("pw").value = "";
+      load(true);
+    } catch (x) { err.hidden = false; }
+  });
+  load(true);
+  setInterval(() => load(false), 15000);
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) load(false); });
+})();
+</script>
+</body>
+</html>

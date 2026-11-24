@@ -1,0 +1,6 @@
+{
+  "name": "skolval",
+  "private": true,
+  "description": "Skolval för Charlie: NA-gymnasier i Stockholm",
+  "engines": { "node": "22.x" }
+}
