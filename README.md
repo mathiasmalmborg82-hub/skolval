@@ -1,7 +1,7 @@
 # Skolval
 
 Sida för Charlies gymnasieval: alla skolor i Stockholms stad och Nacka med naturvetenskapsprogrammet,
-med antagningspoäng, chans utifrån hans meritvärde, öppet hus, restid från Sandsborg,
+med antagningspoäng, chans utifrån hans meritvärde, öppet hus, restid hemifrån (adressen ligger i databasen, inte i repot),
 favoriter, besök, kommentarer och dolda skolor. Varje kommande öppet hus kan läggas i
 Apple Kalender på iPhone och Mac (.ics-fil).
 

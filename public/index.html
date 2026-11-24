@@ -187,7 +187,7 @@ body { margin: 0; }
 
 <div class="wrap">
   <header>
-    <div class="eyebrow"><span class="blink"></span>Player: Charlie · Spawn point: Sandsborg T</div>
+    <div class="eyebrow"><span class="blink"></span>Player: Charlie · Spawn point: Hemma</div>
     <h1><span class="hl">Charlies</span> skolval · Natur</h1>
     <p class="lede">Charlie söker naturvetenskapsprogrammet hösten 2027. Här är alla NA-skolor i Stockholms stad och Nacka som han och föräldrarna jämför. Klicka på en kolumnrubrik för att sortera. Stjärnor, besök, öppet hus och anteckningar sparas direkt. Klicka i en siffra för att rätta den.</p>
   </header>
@@ -263,7 +263,7 @@ body { margin: 0; }
     <div><strong>Merit:</strong> lägsta antagna och medelvärde för antagna, max 340. Några källor anger median i stället för medel, då står ”median” under siffran. Staplarna visar andel av 340. År och källa står under siffran. Tomt betyder att ingen NA-specifik siffra hittades.</div>
     <div><strong>Chans:</strong> jämför ditt meritvärde med förra antagningen. <em>Säker</em> = minst medelmeriten. <em>Bra chans</em> = minst lägsta antagna. <em>Kanske</em> = upp till 10 poäng under lägsta. <em>Svårt</em> = mer än 10 under. Gränserna flyttar sig varje år beroende på vilka som söker, så se det som en fingervisning.</div>
     <div><strong>Öppet hus:</strong> nästa tillfälle är rosa, passerade är överstrukna. Datum kommer från skolornas webbplatser och skolsafari.se, kollade 24 nov 2026. Dubbelkolla på skolans sida innan ni åker. Klicka på ”ändra” för att rätta. Format: <code>2027-01-21 17–19; 2027-04-20</code>.</div>
-    <div><strong>Restid:</strong> dörr till dörr från Sandsborg, vardag dagtid. Busssymbolen är kollektivt (SL), cykeln är cykeltid. Kollektivtiderna utan bock är uppskattningar. En grön <span class="verified">✓</span> betyder att restiden är kontrollerad av pappa. Den sätts automatiskt när någon skriver in en egen restid. ”rutt ↗” öppnar reseplanering så du kan kolla. <strong>Avstånd:</strong> fågelvägen.</div>
+    <div><strong>Restid:</strong> dörr till dörr hemifrån, vardag dagtid. Busssymbolen är kollektivt (SL), cykeln är cykeltid. Kollektivtiderna utan bock är uppskattningar. En grön <span class="verified">✓</span> betyder att restiden är kontrollerad av pappa. Den sätts automatiskt när någon skriver in en egen restid. ”SL ↗” och ”Cykel ↗” öppnar vägbeskrivning hemifrån så du kan kolla. <strong>Avstånd:</strong> fågelvägen.</div>
   </div>
 </div>
 
@@ -280,7 +280,7 @@ body { margin: 0; }
 
 <script>
 (function () {
-  const ORIGIN = { lat: 59.2846, lng: 18.0921 };
+  let ORIGIN = null; // home: { addr, lat, lng }, loaded from /api/settings
   const MAXMERIT = 340;
   const DAY = 86400000;
   let schools = [];
@@ -337,7 +337,7 @@ body { margin: 0; }
   }
 
   function distKm(s) {
-    if (typeof s.lat !== "number" || typeof s.lng !== "number") return null;
+    if (!ORIGIN || typeof ORIGIN.lat !== "number" || typeof s.lat !== "number" || typeof s.lng !== "number") return null;
     const R = 6371, toR = x => x * Math.PI / 180;
     const dLat = toR(s.lat - ORIGIN.lat), dLng = toR(s.lng - ORIGIN.lng);
     const a = Math.sin(dLat / 2) ** 2 + Math.cos(toR(ORIGIN.lat)) * Math.cos(toR(s.lat)) * Math.sin(dLng / 2) ** 2;
@@ -426,7 +426,7 @@ body { margin: 0; }
 
   function routeUrl(s, mode) {
     const dest = s.addr || (s.name + ", Stockholm");
-    return "https://www.google.com/maps/dir/?api=1&origin=" + encodeURIComponent("Sandsborg tunnelbanestation, Stockholm") +
+    return "https://www.google.com/maps/dir/?api=1&origin=" + encodeURIComponent(ORIGIN && ORIGIN.addr ? ORIGIN.addr : "Stockholm") +
       "&destination=" + encodeURIComponent(dest) + "&travelmode=" + (mode || "transit");
   }
 
@@ -646,8 +646,8 @@ body { margin: 0; }
           travelRow(s, "travel", "travelOk", "transit", "Kollektivt"),
           travelRow(s, "bike", "bikeOk", "bike", "Cykel"),
           el("span", { class: "src routes" }, [
-            el("a", { class: "route", href: routeUrl(s, "transit"), target: "_blank", rel: "noopener", text: "SL ↗", title: "Reseplanering med kollektivtrafik från Sandsborg" }),
-            el("a", { class: "route", href: routeUrl(s, "bicycling"), target: "_blank", rel: "noopener", text: "Cykel ↗", title: "Cykelväg från Sandsborg" })
+            el("a", { class: "route", href: routeUrl(s, "transit"), target: "_blank", rel: "noopener", text: "SL ↗", title: "Reseplanering med kollektivtrafik hemifrån" }),
+            el("a", { class: "route", href: routeUrl(s, "bicycling"), target: "_blank", rel: "noopener", text: "Cykel ↗", title: "Cykelväg hemifrån" })
           ])
         ]),
         el("td", { class: "num", text: d === null ? "–" : fmt(d, 1) + " km" }),
@@ -730,6 +730,7 @@ body { margin: 0; }
       const [rows, settings] = await Promise.all([api("/api/schools"), api("/api/settings")]);
       if (!force && isEditing()) return;
       schools = rows;
+      if (settings && settings.origin) ORIGIN = settings.origin;
       if (settings && document.activeElement !== meritIn) setMerit(typeof settings.merit === "number" ? settings.merit : null, true);
       document.getElementById("login").hidden = true;
       statusEl.textContent = schools.length + " skolor";
