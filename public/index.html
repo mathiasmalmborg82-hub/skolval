@@ -118,6 +118,7 @@ a.route:hover { text-decoration: underline; }
 .oh-item.past { opacity: .45; text-decoration: line-through; }
 .oh-none { color: var(--muted); font-size: 12px; }
 .oh-item { flex-wrap: wrap; }
+.verified { color: var(--ok); font-size: 11px; margin-left: 3px; cursor: help; text-shadow: 0 0 6px color-mix(in srgb, var(--ok) 60%, transparent); }
 .cal { display: inline-flex; gap: 8px; }
 .cal a, .cal button { all: unset; cursor: pointer; font-family: var(--font-data); font-size: 10.5px; letter-spacing: .06em; text-transform: uppercase; color: var(--cyan); white-space: nowrap; }
 .cal a:hover, .cal button:hover { text-decoration: underline; }
@@ -253,7 +254,7 @@ body { margin: 0; }
     <div><strong>Merit:</strong> lägsta antagna och medelvärde för antagna, max 340. Några källor anger median i stället för medel, då står ”median” under siffran. Staplarna visar andel av 340. År och källa står under siffran. Tomt betyder att ingen NA-specifik siffra hittades.</div>
     <div><strong>Chans:</strong> jämför ditt meritvärde med förra antagningen. <em>Säker</em> = minst medelmeriten. <em>Bra chans</em> = minst lägsta antagna. <em>Kanske</em> = upp till 10 poäng under lägsta. <em>Svårt</em> = mer än 10 under. Gränserna flyttar sig varje år beroende på vilka som söker, så se det som en fingervisning.</div>
     <div><strong>Öppet hus:</strong> nästa tillfälle är rosa, passerade är överstrukna. Datum kommer från skolornas webbplatser och skolsafari.se, kollade 24 nov 2026. Dubbelkolla på skolans sida innan ni åker. Klicka på ”ändra” för att rätta. Format: <code>2027-01-21 17–19; 2027-04-20</code>.</div>
-    <div><strong>Restid:</strong> uppskattad dörr till dörr med SL från Sandsborg, vardag dagtid. ”rutt ↗” öppnar reseplanering så du kan kolla. <strong>Avstånd:</strong> fågelvägen.</div>
+    <div><strong>Restid:</strong> uppskattad dörr till dörr med SL från Sandsborg, vardag dagtid. En grön <span class="verified">✓</span> betyder att restiden är kontrollerad av pappa. Den sätts automatiskt när någon skriver in en egen restid. ”rutt ↗” öppnar reseplanering så du kan kolla. <strong>Avstånd:</strong> fågelvägen.</div>
   </div>
 </div>
 
@@ -399,6 +400,7 @@ body { margin: 0; }
       if (raw !== "" && !isFinite(n)) { inp.value = fmt(s[key], dec); return; }
       const patch = { [key]: n };
       if (key === "min" || key === "avg") { patch.src = "egen uppgift"; patch.year = ""; }
+      if (key === "travel") patch.travelOk = n !== null;
       save(s.id, patch);
       render();
     });
@@ -617,7 +619,8 @@ body { margin: 0; }
         el("td", { class: "num" }, [numInput(s, "avg", 1, "Medelmerit"), bar(s.avg, "avg")]),
         el("td", null, chanceCell(s)),
         el("td", { class: "num" }, [
-          el("span", null, [numInput(s, "travel", 0, "Restid"), document.createTextNode(" min")]),
+          el("span", null, [numInput(s, "travel", 0, "Restid"), document.createTextNode(" min"),
+            s.travelOk && typeof s.travel === "number" ? el("span", { class: "verified", text: "✓", title: "Restiden är kontrollerad av pappa", "aria-label": "kontrollerad av pappa" }) : null]),
           el("a", { class: "route src", href: routeUrl(s), target: "_blank", rel: "noopener", text: "rutt ↗" })
         ]),
         el("td", { class: "num", text: d === null ? "–" : fmt(d, 1) + " km" }),
