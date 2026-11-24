@@ -118,6 +118,14 @@ a.route:hover { text-decoration: underline; }
 .oh-item.past { opacity: .45; text-decoration: line-through; }
 .oh-none { color: var(--muted); font-size: 12px; }
 .oh-item { flex-wrap: wrap; }
+.trow { display: flex; align-items: center; justify-content: flex-end; gap: 2px; white-space: nowrap; }
+.trow + .trow { margin-top: 2px; }
+.ticon { display: inline-flex; width: 16px; height: 16px; margin-right: 2px; }
+.ticon svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.ticon svg .dot { fill: currentColor; stroke: none; }
+.ticon-transit { color: var(--cyan); }
+.ticon-bike { color: var(--ok); }
+.routes { display: flex; gap: 8px; justify-content: flex-end; }
 .verified { color: var(--ok); font-size: 11px; margin-left: 3px; cursor: help; text-shadow: 0 0 6px color-mix(in srgb, var(--ok) 60%, transparent); }
 .cal { display: inline-flex; gap: 8px; }
 .cal a, .cal button { all: unset; cursor: pointer; font-family: var(--font-data); font-size: 10.5px; letter-spacing: .06em; text-transform: uppercase; color: var(--cyan); white-space: nowrap; }
@@ -237,7 +245,7 @@ body { margin: 0; }
           <th class="num"><button class="sort" data-key="min">Lägsta merit<span class="arrow"></span></button></th>
           <th class="num"><button class="sort" data-key="avg">Medelmerit<span class="arrow"></span></button></th>
           <th><button class="sort" data-key="chance">Chans<span class="arrow"></span></button></th>
-          <th class="num"><button class="sort" data-key="travel">Restid SL<span class="arrow"></span></button></th>
+          <th class="num"><button class="sort" data-key="travel">Restid<span class="arrow"></span></button></th>
           <th class="num"><button class="sort" data-key="dist">Avstånd<span class="arrow"></span></button></th>
           <th><button class="sort" data-key="oh">Öppet hus<span class="arrow"></span></button></th>
           <th><button class="sort" data-key="visited">Besökt<span class="arrow"></span></button></th>
@@ -254,7 +262,7 @@ body { margin: 0; }
     <div><strong>Merit:</strong> lägsta antagna och medelvärde för antagna, max 340. Några källor anger median i stället för medel, då står ”median” under siffran. Staplarna visar andel av 340. År och källa står under siffran. Tomt betyder att ingen NA-specifik siffra hittades.</div>
     <div><strong>Chans:</strong> jämför ditt meritvärde med förra antagningen. <em>Säker</em> = minst medelmeriten. <em>Bra chans</em> = minst lägsta antagna. <em>Kanske</em> = upp till 10 poäng under lägsta. <em>Svårt</em> = mer än 10 under. Gränserna flyttar sig varje år beroende på vilka som söker, så se det som en fingervisning.</div>
     <div><strong>Öppet hus:</strong> nästa tillfälle är rosa, passerade är överstrukna. Datum kommer från skolornas webbplatser och skolsafari.se, kollade 24 nov 2026. Dubbelkolla på skolans sida innan ni åker. Klicka på ”ändra” för att rätta. Format: <code>2027-01-21 17–19; 2027-04-20</code>.</div>
-    <div><strong>Restid:</strong> uppskattad dörr till dörr med SL från Sandsborg, vardag dagtid. En grön <span class="verified">✓</span> betyder att restiden är kontrollerad av pappa. Den sätts automatiskt när någon skriver in en egen restid. ”rutt ↗” öppnar reseplanering så du kan kolla. <strong>Avstånd:</strong> fågelvägen.</div>
+    <div><strong>Restid:</strong> dörr till dörr från Sandsborg, vardag dagtid. Busssymbolen är kollektivt (SL), cykeln är cykeltid. Kollektivtiderna utan bock är uppskattningar. En grön <span class="verified">✓</span> betyder att restiden är kontrollerad av pappa. Den sätts automatiskt när någon skriver in en egen restid. ”rutt ↗” öppnar reseplanering så du kan kolla. <strong>Avstånd:</strong> fågelvägen.</div>
   </div>
 </div>
 
@@ -401,6 +409,7 @@ body { margin: 0; }
       const patch = { [key]: n };
       if (key === "min" || key === "avg") { patch.src = "egen uppgift"; patch.year = ""; }
       if (key === "travel") patch.travelOk = n !== null;
+      if (key === "bike") patch.bikeOk = n !== null;
       save(s.id, patch);
       render();
     });
@@ -414,10 +423,24 @@ body { margin: 0; }
     return b;
   }
 
-  function routeUrl(s) {
+  function routeUrl(s, mode) {
     const dest = s.addr || (s.name + ", Stockholm");
     return "https://www.google.com/maps/dir/?api=1&origin=" + encodeURIComponent("Sandsborg tunnelbanestation, Stockholm") +
-      "&destination=" + encodeURIComponent(dest) + "&travelmode=transit";
+      "&destination=" + encodeURIComponent(dest) + "&travelmode=" + (mode || "transit");
+  }
+
+  /* Travel icons in the style of a maps app: a bus for public transport and a bicycle. */
+  const ICONS = {
+    transit: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="3" width="14" height="14" rx="3"/><path d="M5 10.5h14M9 3.5v7M15 3.5v7M8 21l1.5-4M16 21l-1.5-4"/><circle cx="8.5" cy="14" r="1" class="dot"/><circle cx="15.5" cy="14" r="1" class="dot"/></svg>',
+    bike: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5.5" cy="16.5" r="3.5"/><circle cx="18.5" cy="16.5" r="3.5"/><path d="M5.5 16.5 9.5 9h6l3 7.5M9.5 9l3 7.5h-7M13.5 5.5H16l-.5 3.5"/></svg>'
+  };
+  function travelRow(s, key, okKey, icon, label) {
+    const i = el("span", { class: "ticon ticon-" + icon, title: label, "aria-label": label });
+    i.innerHTML = ICONS[icon];
+    return el("div", { class: "trow" }, [
+      i, numInput(s, key, 0, label + " restid"), document.createTextNode(" min"),
+      s[okKey] && typeof s[key] === "number" ? el("span", { class: "verified", text: "✓", title: label + ": kontrollerad av pappa", "aria-label": "kontrollerad av pappa" }) : null
+    ]);
   }
 
   /* Calendar: each upcoming open house can be saved as an .ics file, which Apple Calendar
@@ -619,9 +642,12 @@ body { margin: 0; }
         el("td", { class: "num" }, [numInput(s, "avg", 1, "Medelmerit"), bar(s.avg, "avg")]),
         el("td", null, chanceCell(s)),
         el("td", { class: "num" }, [
-          el("span", null, [numInput(s, "travel", 0, "Restid"), document.createTextNode(" min"),
-            s.travelOk && typeof s.travel === "number" ? el("span", { class: "verified", text: "✓", title: "Restiden är kontrollerad av pappa", "aria-label": "kontrollerad av pappa" }) : null]),
-          el("a", { class: "route src", href: routeUrl(s), target: "_blank", rel: "noopener", text: "rutt ↗" })
+          travelRow(s, "travel", "travelOk", "transit", "Kollektivt"),
+          travelRow(s, "bike", "bikeOk", "bike", "Cykel"),
+          el("span", { class: "src routes" }, [
+            el("a", { class: "route", href: routeUrl(s, "transit"), target: "_blank", rel: "noopener", text: "SL ↗", title: "Reseplanering med kollektivtrafik från Sandsborg" }),
+            el("a", { class: "route", href: routeUrl(s, "bicycling"), target: "_blank", rel: "noopener", text: "Cykel ↗", title: "Cykelväg från Sandsborg" })
+          ])
         ]),
         el("td", { class: "num", text: d === null ? "–" : fmt(d, 1) + " km" }),
         el("td", null, [ohCell(s)]),
