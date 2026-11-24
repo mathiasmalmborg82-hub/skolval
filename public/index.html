@@ -524,7 +524,7 @@ body { margin: 0; }
     const list = document.getElementById("h-next"), more = document.getElementById("h-next-more");
     list.replaceChildren();
     if (!upcoming.length) { list.appendChild(el("li", null, [el("span", { class: "d", text: "–" }), el("span", { class: "n", text: "Inga kommande öppet hus" })])); more.hidden = true; return; }
-    const LIMIT = 6;
+    const LIMIT = 4;
     upcoming.slice(0, nextExpanded ? upcoming.length : LIMIT).forEach(({ s, it }) => {
       const soon = (it.date - t) / DAY <= 10;
       const name = el("span", { class: "n" }, [
