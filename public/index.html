@@ -131,6 +131,10 @@ a.route:hover { text-decoration: underline; }
 .chance.c1 { color: var(--magenta); }
 .chance.c0 { color: var(--muted); border-style: dashed; }
 .chance-diff { display: block; font-family: var(--font-data); font-size: 10.5px; color: var(--muted); margin-top: 3px; white-space: nowrap; }
+.row-actions { display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: baseline; margin-top: 4px; }
+.site-link { font-family: var(--font-data); font-size: 10.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--cyan); text-decoration: none; }
+.site-link:hover { text-decoration: underline; }
+.site-link:focus-visible { outline: 2px solid var(--magenta); outline-offset: 2px; }
 .hide-btn { all: unset; cursor: pointer; font-family: var(--font-data); font-size: 10.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin-top: 4px; display: inline-block; }
 .hide-btn:hover { color: var(--magenta); }
 .hide-btn:focus-visible { outline: 2px solid var(--magenta); outline-offset: 2px; }
@@ -161,7 +165,7 @@ body { margin: 0; }
   <header>
     <div class="eyebrow"><span class="blink"></span>Player: Charlie · Spawn point: Sandsborg T</div>
     <h1><span class="hl">Charlies</span> skolval · Natur</h1>
-    <p class="lede">Charlie söker naturvetenskapsprogrammet hösten 2027. Här är alla NA-skolor i Stockholms stad som han och föräldrarna jämför. Klicka på en kolumnrubrik för att sortera. Stjärnor, besök, öppet hus och anteckningar sparas direkt. Klicka i en siffra för att rätta den.</p>
+    <p class="lede">Charlie söker naturvetenskapsprogrammet hösten 2027. Här är alla NA-skolor i Stockholms stad och Nacka som han och föräldrarna jämför. Klicka på en kolumnrubrik för att sortera. Stjärnor, besök, öppet hus och anteckningar sparas direkt. Klicka i en siffra för att rätta den.</p>
   </header>
 
   <div class="login" id="login" hidden>
@@ -242,6 +246,7 @@ body { margin: 0; }
     <strong>Lägg till skola</strong>
     <label>Skolans namn<input id="a-name" required></label>
     <label>Område<input id="a-area" placeholder="t.ex. Södermalm"></label>
+    <label>Hemsida<input id="a-url" type="url" placeholder="https://…"></label>
     <label>Huvudman<select id="a-type"><option value="kommunal">Kommunal</option><option value="fristående">Fristående</option></select></label>
     <div class="row"><button type="button" class="btn ghost" id="a-cancel">Avbryt</button><button class="btn" type="submit">Spara</button></div>
   </form>
@@ -518,7 +523,10 @@ body { margin: 0; }
         el("td", null, [
           el("div", { class: "name", text: s.name }),
           el("div", { class: "sub", text: [s.area, s.track].filter(Boolean).join(" · ") }),
-          hideBtn
+          el("div", { class: "row-actions" }, [
+            /^https:\/\//.test(s.url || "") ? el("a", { class: "site-link", href: s.url, target: "_blank", rel: "noopener noreferrer", text: "Hemsida ↗", "aria-label": "Hemsida för " + s.name }) : null,
+            hideBtn
+          ])
         ]),
         el("td", null, [el("span", { class: "tag " + (s.type === "kommunal" ? "kom" : "fri"), text: s.type || "–" })]),
         el("td", { class: "num" }, [numInput(s, "min", 1, "Lägsta merit"), bar(s.min), el("span", { class: "src", text: [s.year, s.src].filter(Boolean).join(" · ") })]),
@@ -575,7 +583,8 @@ body { margin: 0; }
     e.preventDefault();
     const name = document.getElementById("a-name").value.trim();
     if (!name) return;
-    const doc = { name, area: document.getElementById("a-area").value.trim(), type: document.getElementById("a-type").value,
+    const url = document.getElementById("a-url").value.trim();
+    const doc = { name, area: document.getElementById("a-area").value.trim(), type: document.getElementById("a-type").value, url: /^https:\/\//.test(url) ? url : "",
       min: null, avg: null, travel: null, fav: 0, visited: false, comment: "", src: "", year: "", oh: "", ohSrc: "" };
     dlg.close();
     document.getElementById("addform").reset();

@@ -1,6 +1,6 @@
 # Skolval
 
-Sida för Charlies gymnasieval: alla skolor i Stockholms stad med naturvetenskapsprogrammet,
+Sida för Charlies gymnasieval: alla skolor i Stockholms stad och Nacka med naturvetenskapsprogrammet, plus Nacka,
 med antagningspoäng, chans utifrån hans meritvärde, öppet hus, restid från Sandsborg,
 favoriter, besök, kommentarer och dolda skolor.
 
