@@ -108,6 +108,11 @@ a.route:hover { text-decoration: underline; }
 .oh-item.soon .oh-date::after { content: " SNART"; font-size: 9.5px; letter-spacing: .08em; }
 .oh-item.past { opacity: .45; text-decoration: line-through; }
 .oh-none { color: var(--muted); font-size: 12px; }
+.oh-item { flex-wrap: wrap; }
+.cal { display: inline-flex; gap: 8px; }
+.cal a, .cal button { all: unset; cursor: pointer; font-family: var(--font-data); font-size: 10.5px; letter-spacing: .06em; text-transform: uppercase; color: var(--cyan); white-space: nowrap; }
+.cal a:hover, .cal button:hover { text-decoration: underline; }
+.cal a:focus-visible, .cal button:focus-visible { outline: 2px solid var(--magenta); outline-offset: 2px; }
 .oh-edit { all: unset; cursor: pointer; font-family: var(--font-data); font-size: 10.5px; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; }
 .oh-edit:hover { color: var(--cyan); }
 .oh-input { width: 100%; font: inherit; font-family: var(--font-data); font-size: 12px; color: var(--fg); background: var(--bg); border: 1px solid var(--cyan); padding: 4px 6px; }
@@ -206,6 +211,7 @@ body { margin: 0; }
     <button class="chip" id="f-oh" aria-pressed="false">Har kommande öppet hus</button>
     <button class="chip" id="f-reach" aria-pressed="false">Bara inom räckhåll</button>
     <button class="chip" id="f-hidden" aria-pressed="false" hidden>Visa dolda</button>
+    <button class="chip" id="cal-all" title="Alla kommande öppet hus för skolorna som syns i listan, som en kalenderfil">Alla öppet hus till kalendern</button>
     <button class="btn" id="add">+ Lägg till skola</button>
     <span class="status" id="status">Ansluter…</span>
   </div>
@@ -401,6 +407,69 @@ body { margin: 0; }
       "&destination=" + encodeURIComponent(dest) + "&travelmode=transit";
   }
 
+  /* Calendar: each upcoming open house can be saved as an .ics file (iPhone, Mac, Outlook,
+     Android) or opened in Google Calendar. Times are read from the note, e.g. "17–19",
+     "16.30–18.30" or "från 17.30"; without a time it becomes an all-day event. */
+  const SITE_URL = "https://skolval.klingemo.se";
+  const pad2 = x => String(x).padStart(2, "0");
+  const ymd = d => d.getFullYear() + pad2(d.getMonth() + 1) + pad2(d.getDate());
+  function ohTimes(it) {
+    const n = it.note || "";
+    let sh, sm, eh, em, m = n.match(/(\d{1,2})(?:[.:](\d{2}))?\s*[–-]\s*(\d{1,2})(?:[.:](\d{2}))?/);
+    if (m && +m[1] < 24 && +m[3] < 24) { sh = +m[1]; sm = +(m[2] || 0); eh = +m[3]; em = +(m[4] || 0); }
+    else if ((m = n.match(/(?:från|kl\.?)\s*(\d{1,2})(?:[.:](\d{2}))?/i)) && +m[1] < 24) { sh = +m[1]; sm = +(m[2] || 0); eh = Math.min(sh + 2, 23); em = sm; }
+    if (sh === undefined) return { allDay: true, start: ymd(it.date), end: ymd(new Date(it.date.getTime() + DAY)) };
+    const day = ymd(it.date);
+    return { allDay: false, start: day + "T" + pad2(sh) + pad2(sm) + "00", end: day + "T" + pad2(eh) + pad2(em) + "00" };
+  }
+  function ohTitle(s, it) { return (/skoldag/i.test(it.note || "") ? "Öppen skoldag: " : "Öppet hus: ") + s.name; }
+  function ohDesc(s, it) {
+    return [it.note ? "Tid/info: " + it.note : "", "Kontrollera tiden på skolans webbplats.", s.url ? "Hemsida: " + s.url : "", "Charlies skolval: " + SITE_URL].filter(Boolean).join("\n");
+  }
+  function icsText(x) { return String(x || "").replace(/\\/g, "\\\\").replace(/;/g, "\\;").replace(/,/g, "\\,").replace(/\r?\n/g, "\\n"); }
+  function icsFold(line) {
+    const out = []; let cur = "";
+    for (const ch of line) { if (new TextEncoder().encode(cur + ch).length > 73) { out.push(cur); cur = " " + ch; } else cur += ch; }
+    out.push(cur); return out.join("\r\n");
+  }
+  function icsEvent(s, it) {
+    const t = ohTimes(it);
+    const stamp = new Date().toISOString().replace(/[-:]/g, "").replace(/\.\d+Z$/, "Z");
+    const when = t.allDay ? ["DTSTART;VALUE=DATE:" + t.start, "DTEND;VALUE=DATE:" + t.end]
+                          : ["DTSTART;TZID=Europe/Stockholm:" + t.start, "DTEND;TZID=Europe/Stockholm:" + t.end];
+    return ["BEGIN:VEVENT", "UID:" + s.id + "-" + t.start + "@skolval.klingemo.se", "DTSTAMP:" + stamp].concat(when, [
+      "SUMMARY:" + icsText(ohTitle(s, it)), "LOCATION:" + icsText(s.addr || s.name),
+      "DESCRIPTION:" + icsText(ohDesc(s, it)), s.url ? "URL:" + s.url : "",
+      "BEGIN:VALARM", "ACTION:DISPLAY", "DESCRIPTION:" + icsText(ohTitle(s, it)), "TRIGGER:-P1D", "END:VALARM",
+      "END:VEVENT"]).filter(Boolean);
+  }
+  const VTZ = ["BEGIN:VTIMEZONE", "TZID:Europe/Stockholm",
+    "BEGIN:DAYLIGHT", "TZOFFSETFROM:+0100", "TZOFFSETTO:+0200", "TZNAME:CEST", "DTSTART:19700329T020000", "RRULE:FREQ=YEARLY;BYMONTH=3;BYDAY=-1SU", "END:DAYLIGHT",
+    "BEGIN:STANDARD", "TZOFFSETFROM:+0200", "TZOFFSETTO:+0100", "TZNAME:CET", "DTSTART:19701025T030000", "RRULE:FREQ=YEARLY;BYMONTH=10;BYDAY=-1SU", "END:STANDARD",
+    "END:VTIMEZONE"];
+  function downloadIcs(events, filename) {
+    const lines = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Charlies skolval//SV", "CALSCALE:GREGORIAN", "METHOD:PUBLISH", "X-WR-CALNAME:Charlies skolval"]
+      .concat(VTZ, ...events, ["END:VCALENDAR"]);
+    const blob = new Blob([lines.map(icsFold).join("\r\n") + "\r\n"], { type: "text/calendar;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = el("a", { href: url, download: filename });
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 10000);
+  }
+  function googleUrl(s, it) {
+    const t = ohTimes(it);
+    const q = new URLSearchParams({ action: "TEMPLATE", text: ohTitle(s, it), dates: t.start + "/" + t.end,
+      ctz: "Europe/Stockholm", details: ohDesc(s, it), location: s.addr || s.name });
+    return "https://calendar.google.com/calendar/render?" + q.toString();
+  }
+  const fileSafe = x => x.toLowerCase().normalize("NFD").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+  function calLinks(s, it) {
+    const b = el("button", { text: "+ Kalender", title: "Spara som kalenderfil (iPhone, Mac, Outlook, Android)", "aria-label": "Lägg till i kalendern: " + ohTitle(s, it) + " " + fmtDate(it.date) });
+    b.addEventListener("click", () => downloadIcs([icsEvent(s, it)], "oppet-hus-" + fileSafe(s.name) + "-" + ymd(it.date) + ".ics"));
+    const g = el("a", { href: googleUrl(s, it), target: "_blank", rel: "noopener noreferrer", text: "Google", "aria-label": "Lägg till i Google Kalender: " + ohTitle(s, it) });
+    return el("span", { class: "cal" }, [b, g]);
+  }
+
   function ohCell(s) {
     const wrap = el("div", { class: "oh" });
     if (editingOh === s.id) {
@@ -424,7 +493,8 @@ body { margin: 0; }
       }
       wrap.appendChild(el("div", { class: cls }, [
         el("span", { class: "oh-date", text: it.date ? fmtDate(it.date) : "?" }),
-        el("span", { class: "oh-note", text: it.note })
+        el("span", { class: "oh-note", text: it.note }),
+        it.date && it.date >= t ? calLinks(s, it) : null
       ]));
     });
     const meta = el("div", { class: "src" });
@@ -561,6 +631,16 @@ body { margin: 0; }
   toggle("f-unvisited", () => filterUnvisited, v => filterUnvisited = v);
   toggle("f-oh", () => filterOh, v => filterOh = v);
   toggle("f-reach", () => filterReach, v => filterReach = v);
+  document.getElementById("cal-all").addEventListener("click", () => {
+    const t = today(), q = query.trim().toLowerCase(), events = [];
+    schools.filter(s => (showHidden || !s.hidden) && (!filterFav || (s.fav || 0) > 0) && (!filterUnvisited || !s.visited) &&
+        (!filterReach || merit === null || (chance(s) || 0) >= 2) &&
+        (!q || (s.name + " " + (s.area || "") + " " + (s.comment || "")).toLowerCase().includes(q)))
+      .forEach(s => parseOh(s.oh).forEach(it => { if (it.date && it.date >= t) events.push(icsEvent(s, it)); }));
+    if (!events.length) { statusEl.textContent = "Inga kommande öppet hus i listan"; return; }
+    downloadIcs(events, "charlies-oppet-hus.ics");
+    statusEl.textContent = events.length + " öppet hus sparade som kalenderfil";
+  });
   toggle("f-hidden", () => showHidden, v => showHidden = v);
 
   try { const m = parseFloat(localStorage.getItem("na-merit") || ""); if (isFinite(m)) setMerit(m, true); } catch (e) {}
