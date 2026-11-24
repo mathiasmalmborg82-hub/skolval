@@ -49,8 +49,17 @@ h1 .hl { color: var(--magenta); text-shadow: 0 0 18px color-mix(in srgb, var(--m
 .stat .val { font-family: var(--font-display); font-size: 22px; font-weight: 700; }
 .xp { height: 8px; background: var(--bg); border: 1px solid var(--line); margin-top: 6px; }
 .xp > i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, var(--cyan), var(--magenta)); box-shadow: 0 0 10px var(--cyan); transition: width .4s; }
-.stat.next .val { font-size: 16px; line-height: 1.3; }
-.stat.next .val small { display: block; font-family: var(--font-data); font-size: 12px; color: var(--cyan); font-weight: 400; }
+.stat.next { flex: 3 1 360px; }
+.next-list { list-style: none; margin: 6px 0 0; padding: 0; display: grid; gap: 4px; }
+.next-list li { display: grid; grid-template-columns: 9.5ch 1fr; gap: 2px 10px; align-items: baseline; font-size: 13px; }
+.next-list .d { font-family: var(--font-data); font-weight: 600; color: var(--cyan); white-space: nowrap; }
+.next-list li.soon .d { color: var(--magenta); }
+.next-list .n { min-width: 0; }
+.next-list .n .fav-star { color: var(--star); }
+.next-list .n small { color: var(--muted); font-family: var(--font-data); font-size: 11px; margin-left: 6px; }
+.next-more { all: unset; cursor: pointer; margin-top: 6px; font-family: var(--font-data); font-size: 10.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.next-more:hover { color: var(--cyan); }
+.next-more:focus-visible { outline: 2px solid var(--magenta); outline-offset: 2px; }
 
 .toolbar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
 .toolbar input[type=search] { flex: 1 1 220px; min-width: 0; padding: 9px 12px; border: 1px solid var(--line); background: var(--surface); color: var(--fg); font: inherit; border-radius: 0; }
@@ -199,8 +208,9 @@ body { margin: 0; }
       <div class="val" id="h-fav">–</div>
     </div>
     <div class="stat next">
-      <div class="lbl">Nästa öppet hus</div>
-      <div class="val" id="h-next">–</div>
+      <div class="lbl">Kommande öppet hus</div>
+      <ul class="next-list" id="h-next"><li><span class="d">–</span><span class="n">Laddar…</span></li></ul>
+      <button class="next-more" id="h-next-more" hidden></button>
     </div>
   </section>
 
@@ -286,6 +296,7 @@ body { margin: 0; }
     if (!fromStore) try { localStorage.setItem("na-merit", merit === null ? "" : String(merit)); } catch (e) {}
   }
   let editingOh = null;
+  let nextExpanded = false;
   const statusEl = document.getElementById("status");
   const tbody = document.getElementById("rows");
 
@@ -505,14 +516,24 @@ body { margin: 0; }
     document.getElementById("h-visited").textContent = total ? vis + " / " + total : "–";
     document.getElementById("h-xp").style.width = total ? (vis / total * 100) + "%" : "0";
     document.getElementById("h-fav").textContent = total ? shown.filter(s => (s.fav || 0) > 0).length + " skolor" : "–";
-    const nexts = shown.map(s => ({ s, n: nextOh(s) })).filter(x => x.n).sort((a, b) => a.n.date - b.n.date);
-    const favFirst = nexts.find(x => (x.s.fav || 0) > 0);
-    const pick = favFirst || nexts[0];
-    const h = document.getElementById("h-next");
-    h.replaceChildren();
-    if (!pick) { h.textContent = "–"; return; }
-    h.appendChild(document.createTextNode(pick.s.name));
-    h.appendChild(el("small", { text: fmtDate(pick.n.date) + (pick.n.note ? " · " + pick.n.note : "") + (favFirst ? " · favorit" : "") }));
+    const t = today(), upcoming = [];
+    shown.forEach(s => parseOh(s.oh).forEach(it => { if (it.date && it.date >= t) upcoming.push({ s, it }); }));
+    upcoming.sort((a, b) => a.it.date - b.it.date || (b.s.fav || 0) - (a.s.fav || 0));
+    const list = document.getElementById("h-next"), more = document.getElementById("h-next-more");
+    list.replaceChildren();
+    if (!upcoming.length) { list.appendChild(el("li", null, [el("span", { class: "d", text: "–" }), el("span", { class: "n", text: "Inga kommande öppet hus" })])); more.hidden = true; return; }
+    const LIMIT = 6;
+    upcoming.slice(0, nextExpanded ? upcoming.length : LIMIT).forEach(({ s, it }) => {
+      const soon = (it.date - t) / DAY <= 10;
+      const name = el("span", { class: "n" }, [
+        (s.fav || 0) > 0 ? el("span", { class: "fav-star", text: "★ ", "aria-label": "Favorit" }) : null,
+        document.createTextNode(s.name),
+        it.note ? el("small", { text: it.note }) : null
+      ]);
+      list.appendChild(el("li", { class: soon ? "soon" : "" }, [el("span", { class: "d", text: fmtDate(it.date) }), name]));
+    });
+    more.hidden = upcoming.length <= LIMIT;
+    more.textContent = nextExpanded ? "Visa färre" : "Visa alla " + upcoming.length;
   }
 
   function renderTally() {
@@ -624,6 +645,7 @@ body { margin: 0; }
   toggle("f-unvisited", () => filterUnvisited, v => filterUnvisited = v);
   toggle("f-oh", () => filterOh, v => filterOh = v);
   toggle("f-reach", () => filterReach, v => filterReach = v);
+  document.getElementById("h-next-more").addEventListener("click", () => { nextExpanded = !nextExpanded; renderHud(); });
   document.getElementById("cal-all").addEventListener("click", () => {
     const t = today(), q = query.trim().toLowerCase(), events = [];
     schools.filter(s => (showHidden || !s.hidden) && (!filterFav || (s.fav || 0) > 0) && (!filterUnvisited || !s.visited) &&
