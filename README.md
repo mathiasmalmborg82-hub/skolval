@@ -3,7 +3,7 @@
 Sida för Charlies gymnasieval: alla skolor i Stockholms stad och Nacka med naturvetenskapsprogrammet,
 med antagningspoäng, chans utifrån hans meritvärde, öppet hus, restid från Sandsborg,
 favoriter, besök, kommentarer och dolda skolor. Varje kommande öppet hus kan läggas i
-kalendern (.ics-fil för iPhone/Mac/Outlook/Android, eller Google Kalender).
+Apple Kalender på iPhone och Mac (.ics-fil).
 
 Adress: **https://skolval.klingemo.se**, skyddad med ett gemensamt familjelösenord.
 

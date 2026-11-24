@@ -407,8 +407,8 @@ body { margin: 0; }
       "&destination=" + encodeURIComponent(dest) + "&travelmode=transit";
   }
 
-  /* Calendar: each upcoming open house can be saved as an .ics file (iPhone, Mac, Outlook,
-     Android) or opened in Google Calendar. Times are read from the note, e.g. "17–19",
+  /* Calendar: each upcoming open house can be saved as an .ics file, which Apple Calendar
+     on iPhone and Mac opens directly. Times are read from the note, e.g. "17–19",
      "16.30–18.30" or "från 17.30"; without a time it becomes an all-day event. */
   const SITE_URL = "https://skolval.klingemo.se";
   const pad2 = x => String(x).padStart(2, "0");
@@ -456,18 +456,11 @@ body { margin: 0; }
     document.body.appendChild(a); a.click(); a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 10000);
   }
-  function googleUrl(s, it) {
-    const t = ohTimes(it);
-    const q = new URLSearchParams({ action: "TEMPLATE", text: ohTitle(s, it), dates: t.start + "/" + t.end,
-      ctz: "Europe/Stockholm", details: ohDesc(s, it), location: s.addr || s.name });
-    return "https://calendar.google.com/calendar/render?" + q.toString();
-  }
   const fileSafe = x => x.toLowerCase().normalize("NFD").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
   function calLinks(s, it) {
-    const b = el("button", { text: "+ Kalender", title: "Spara som kalenderfil (iPhone, Mac, Outlook, Android)", "aria-label": "Lägg till i kalendern: " + ohTitle(s, it) + " " + fmtDate(it.date) });
+    const b = el("button", { text: "+ Kalender", title: "Lägg till i Kalender på iPhone eller Mac", "aria-label": "Lägg till i kalendern: " + ohTitle(s, it) + " " + fmtDate(it.date) });
     b.addEventListener("click", () => downloadIcs([icsEvent(s, it)], "oppet-hus-" + fileSafe(s.name) + "-" + ymd(it.date) + ".ics"));
-    const g = el("a", { href: googleUrl(s, it), target: "_blank", rel: "noopener noreferrer", text: "Google", "aria-label": "Lägg till i Google Kalender: " + ohTitle(s, it) });
-    return el("span", { class: "cal" }, [b, g]);
+    return el("span", { class: "cal" }, [b]);
   }
 
   function ohCell(s) {
