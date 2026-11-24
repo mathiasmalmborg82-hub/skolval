@@ -436,7 +436,8 @@ body { margin: 0; }
     bike: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5.5" cy="16.5" r="3.5"/><circle cx="18.5" cy="16.5" r="3.5"/><path d="M5.5 16.5 9.5 9h6l3 7.5M9.5 9l3 7.5h-7M13.5 5.5H16l-.5 3.5"/></svg>'
   };
   function travelRow(s, key, okKey, icon, label) {
-    const i = el("span", { class: "ticon ticon-" + icon, title: label, "aria-label": label });
+    const info = key === "travel" ? s.travelInfo : s.bikeInfo;
+    const i = el("span", { class: "ticon ticon-" + icon, title: info ? label + ": " + info : label, "aria-label": label });
     i.innerHTML = ICONS[icon];
     return el("div", { class: "trow" }, [
       i, numInput(s, key, 0, label + " restid"), document.createTextNode(" min"),
