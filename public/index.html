@@ -460,7 +460,7 @@ body { margin: 0; }
     const day = ymd(it.date);
     return { allDay: false, start: day + "T" + pad2(sh) + pad2(sm) + "00", end: day + "T" + pad2(eh) + pad2(em) + "00" };
   }
-  function ohTitle(s, it) { return (/skoldag/i.test(it.note || "") ? "Öppen skoldag: " : "Öppet hus: ") + s.name; }
+  function ohTitle(s, it) { const n = it.note || ""; return (/prova på/i.test(n) ? "Prova på: " : /skoldag/i.test(n) ? "Öppen skoldag: " : "Öppet hus: ") + s.name; }
   function ohDesc(s, it) {
     return [it.note ? "Tid/info: " + it.note : "", "Kontrollera tiden på skolans webbplats.", s.url ? "Hemsida: " + s.url : "", "Charlies skolval: " + SITE_URL].filter(Boolean).join("\n");
   }
