@@ -103,6 +103,7 @@ tbody tr.visited { box-shadow: inset 3px 0 0 var(--ok); }
 .stars button.on { color: var(--star); text-shadow: 0 0 8px color-mix(in srgb, var(--star) 70%, transparent); }
 .stars button:focus-visible { outline: 2px solid var(--magenta); }
 td.fav { white-space: nowrap; }
+td.visit { text-align: center; }
 input[type=checkbox] { width: 20px; height: 20px; accent-color: var(--ok); cursor: pointer; }
 textarea.comment { width: 100%; min-width: 200px; min-height: 36px; resize: vertical; font: inherit; color: var(--fg); background: var(--bg); border: 1px solid var(--line); padding: 6px 8px; }
 textarea.comment:focus { outline: none; border-color: var(--cyan); }
@@ -241,6 +242,7 @@ body { margin: 0; }
       <thead>
         <tr>
           <th><button class="sort" data-key="fav">Favorit<span class="arrow"></span></button></th>
+          <th><button class="sort" data-key="visited">Besökt<span class="arrow"></span></button></th>
           <th><button class="sort" data-key="name">Skola<span class="arrow"></span></button></th>
           <th><button class="sort" data-key="type">Huvudman<span class="arrow"></span></button></th>
           <th class="num"><button class="sort" data-key="min">Lägsta merit<span class="arrow"></span></button></th>
@@ -249,7 +251,6 @@ body { margin: 0; }
           <th class="num"><button class="sort" data-key="travel">Restid<span class="arrow"></span></button></th>
           <th class="num"><button class="sort" data-key="dist">Avstånd<span class="arrow"></span></button></th>
           <th><button class="sort" data-key="oh">Öppet hus<span class="arrow"></span></button></th>
-          <th><button class="sort" data-key="visited">Besökt<span class="arrow"></span></button></th>
           <th style="width:24%"><button class="sort" data-key="comment">Kommentar<span class="arrow"></span></button></th>
         </tr>
       </thead>
@@ -631,6 +632,7 @@ body { margin: 0; }
       hideBtn.addEventListener("click", () => { save(s.id, { hidden: !s.hidden }); render(); });
       const tr = el("tr", { class: [s.visited ? "visited" : "", chance(s) === 1 ? "out" : "", s.hidden ? "hidden-row" : ""].join(" ").trim() }, [
         el("td", { class: "fav" }, [stars]),
+        el("td", { class: "visit" }, [cb]),
         el("td", null, [
           el("div", { class: "name", text: s.name }),
           el("div", { class: "sub", text: [s.area, s.track].filter(Boolean).join(" · ") }),
@@ -653,7 +655,6 @@ body { margin: 0; }
         ]),
         el("td", { class: "num", text: d === null ? "–" : fmt(d, 1) + " km" }),
         el("td", null, [ohCell(s)]),
-        el("td", null, [cb]),
         el("td", null, [ta])
       ]);
       tbody.appendChild(tr);
