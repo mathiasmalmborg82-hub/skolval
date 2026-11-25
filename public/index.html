@@ -72,6 +72,16 @@ h1 .hl { color: var(--magenta); text-shadow: 0 0 18px color-mix(in srgb, var(--m
 .status { font-size: 12px; color: var(--muted); margin-left: auto; font-family: var(--font-data); }
 button:focus-visible, .chip:focus-visible { outline: 2px solid var(--magenta); outline-offset: 2px; }
 
+.table-wrap { position: relative; display: grid; gap: 8px; min-width: 0; }
+.table-wrap::before, .table-wrap::after { content: ""; position: absolute; bottom: 0; width: 48px; pointer-events: none; z-index: 2; opacity: 0; transition: opacity .2s; }
+.table-wrap::before { left: 0; top: var(--hint-h, 0px); background: linear-gradient(90deg, color-mix(in srgb, var(--magenta) 35%, transparent), transparent); }
+.table-wrap::after { right: 0; top: var(--hint-h, 0px); background: linear-gradient(270deg, color-mix(in srgb, var(--magenta) 35%, transparent), transparent); }
+.table-wrap.more-left::before, .table-wrap.more-right::after { opacity: 1; }
+.scroll-hint { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 12.5px; color: var(--muted); }
+.scroll-hint span { flex: 1 1 260px; }
+.scroll-btn { border: 1px solid var(--magenta); background: var(--surface); color: var(--magenta); font: inherit; font-family: var(--font-data); font-size: 16px; line-height: 1; padding: 6px 12px; cursor: pointer; }
+.scroll-btn:disabled { opacity: .35; cursor: default; }
+.scroll-btn:focus-visible { outline: 2px solid var(--magenta); outline-offset: 2px; }
 .table-box { overflow-x: auto; background: color-mix(in srgb, var(--surface) 88%, transparent); border: 1px solid var(--line); min-width: 0; }
 table { border-collapse: collapse; width: 100%; min-width: 1240px; }
 th, td { text-align: left; padding: 9px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
@@ -237,7 +247,13 @@ body { margin: 0; }
     <span class="status" id="status">Ansluter…</span>
   </div>
 
-  <div class="table-box">
+  <div class="table-wrap" id="table-wrap">
+  <div class="scroll-hint" id="scroll-hint" hidden>
+    <span>Tabellen är bredare än skärmen. Fler kolumner finns åt höger: öppet hus och kommentar.</span>
+    <button type="button" class="scroll-btn" id="scroll-left" aria-label="Scrolla tabellen åt vänster">←</button>
+    <button type="button" class="scroll-btn" id="scroll-right" aria-label="Scrolla tabellen åt höger">→</button>
+  </div>
+  <div class="table-box" id="table-box">
     <table>
       <thead>
         <tr>
@@ -258,6 +274,7 @@ body { margin: 0; }
         <tr><td colspan="11" class="empty">Laddar skolorna… Om inget dyker upp, lägg till en skola med knappen ovan.</td></tr>
       </tbody>
     </table>
+  </div>
   </div>
 
   <div class="notes">
@@ -752,6 +769,24 @@ body { margin: 0; }
       load(true);
     } catch (x) { err.hidden = false; }
   });
+  /* Make sideways scrolling obvious: show a hint with arrow buttons and coloured edges
+     whenever the table is wider than the screen. */
+  const tbox = document.getElementById("table-box"), twrap = document.getElementById("table-wrap"), hint = document.getElementById("scroll-hint");
+  const sl = document.getElementById("scroll-left"), sr = document.getElementById("scroll-right");
+  function updateScrollCue() {
+    const over = tbox.scrollWidth - tbox.clientWidth > 4;
+    hint.hidden = !over;
+    twrap.style.setProperty("--hint-h", over ? (hint.offsetHeight + 8) + "px" : "0px");
+    const left = tbox.scrollLeft > 4, right = tbox.scrollLeft < tbox.scrollWidth - tbox.clientWidth - 4;
+    twrap.classList.toggle("more-left", over && left);
+    twrap.classList.toggle("more-right", over && right);
+    sl.disabled = !left; sr.disabled = !right;
+  }
+  sl.addEventListener("click", () => tbox.scrollBy({ left: -tbox.clientWidth * 0.8, behavior: "smooth" }));
+  sr.addEventListener("click", () => tbox.scrollBy({ left: tbox.clientWidth * 0.8, behavior: "smooth" }));
+  tbox.addEventListener("scroll", updateScrollCue, { passive: true });
+  window.addEventListener("resize", updateScrollCue);
+  if (window.ResizeObserver) new ResizeObserver(updateScrollCue).observe(tbox.querySelector("table"));
   load(true);
   setInterval(() => load(false), 15000);
   document.addEventListener("visibilitychange", () => { if (!document.hidden) load(false); });
